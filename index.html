@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xsukax GPG/PGP File Encryptor/Decryptor</title>
+    <script src="https://unpkg.com/openpgp@5.10.2/dist/openpgp.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --surface-hover: #1c2128;
+            --border: #30363d;
+            --border-hover: #484f58;
+            --text: #e6edf3;
+            --text-muted: #7d8590;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #539bf5;
+            --accent-muted: rgba(88, 166, 255, 0.1);
+            --success: #3fb950;
+            --success-muted: rgba(63, 185, 80, 0.15);
+            --error: #f85149;
+            --error-muted: rgba(248, 81, 73, 0.15);
+            --warning: #d29922;
+            --warning-muted: rgba(210, 153, 34, 0.15);
+        }
+        
+        [data-theme="light"] {
+            --bg: #ffffff;
+            --surface: #f6f8fa;
+            --surface-hover: #eaeef2;
+            --border: #d0d7de;
+            --border-hover: #8c959f;
+            --text: #1f2328;
+            --text-muted: #656d76;
+            --text-secondary: #424a53;
+            --accent: #0969da;
+            --accent-hover: #0860ca;
+            --accent-muted: rgba(9, 105, 218, 0.1);
+            --success: #1a7f37;
+            --success-muted: rgba(26, 127, 55, 0.15);
+            --error: #d1242f;
+            --error-muted: rgba(209, 36, 47, 0.15);
+            --warning: #9a6700;
+            --warning-muted: rgba(154, 103, 0, 0.15);
+        }
+        
+        body {
+            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', 'Consolas', 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            transition: background-color 0.2s ease, color 0.2s ease;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+            min-height: 100vh;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 48px;
+            padding-bottom: 24px;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .title {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--accent);
+            text-shadow: 0 0 20px var(--accent-muted);
+            letter-spacing: -0.5px;
+        }
+        
+        .subtitle {
+            font-size: 15px;
+            color: var(--text-muted);
+            margin-top: 6px;
+            font-weight: 500;
+        }
+        
+        .theme-toggle {
+            position: relative;
+            width: 64px;
+            height: 32px;
+            background: var(--border);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid var(--border);
+            overflow: hidden;
+        }
+        
+        .theme-toggle:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-muted);
+        }
+        
+        .theme-toggle::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 24px;
+            height: 24px;
+            background: var(--accent);
+            border-radius: 50%;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        [data-theme="light"] .theme-toggle::before {
+            transform: translateX(30px);
+        }
+        
+        .terminal {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            transition: border-color 0.2s ease;
+        }
+        
+        .terminal-header {
+            background: var(--border);
+            padding: 16px 24px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+        
+        .terminal-header::before {
+            content: '●●●';
+            color: var(--accent);
+            font-size: 18px;
+            letter-spacing: 2px;
+        }
+        
+        .terminal-body {
+            padding: 36px;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 36px;
+            border-bottom: 2px solid var(--border);
+            background: var(--surface-hover);
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 16px 24px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+            border-bottom: 3px solid transparent;
+            font-weight: 600;
+            font-size: 15px;
+            background: transparent;
+            border: none;
+            text-align: center;
+            position: relative;
+        }
+        
+        .tab:hover:not(.active) {
+            color: var(--text-secondary);
+            background: var(--accent-muted);
+        }
+        
+        .tab.active {
+            color: var(--accent);
+            background: var(--accent-muted);
+            border-bottom-color: var(--accent);
+        }
+        
+        .tab-content {
+            display: none;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .tab-content.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .form-group {
+            margin-bottom: 32px;
+        }
+        
+        .label {
+            display: block;
+            margin-bottom: 12px;
+            font-size: 15px;
+            color: var(--text);
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+        
+        .file-input {
+            width: 100%;
+            padding: 16px 20px;
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        
+        .file-input:hover {
+            border-color: var(--accent);
+            background: var(--accent-muted);
+        }
+        
+        .file-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-muted);
+        }
+        
+        .file-status {
+            margin-top: 12px;
+            font-size: 13px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            border-left: 4px solid var(--border);
+            background: var(--surface-hover);
+            color: var(--text-muted);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .file-status.success {
+            color: var(--success);
+            border-left-color: var(--success);
+            background: var(--success-muted);
+        }
+        
+        .file-status.error {
+            color: var(--error);
+            border-left-color: var(--error);
+            background: var(--error-muted);
+        }
+        
+        .file-status.warning {
+            color: var(--warning);
+            border-left-color: var(--warning);
+            background: var(--warning-muted);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+            color: #ffffff;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .btn:hover:not(:disabled)::before {
+            left: 100%;
+        }
+        
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px var(--accent-muted);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            background: var(--border);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn:disabled::before {
+            display: none;
+        }
+        
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--accent);
+            border: 2px solid var(--border);
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--surface-hover);
+            border-color: var(--accent);
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 40px 0;
+            padding: 24px;
+            background: var(--surface-hover);
+            border-radius: 8px;
+            border: 2px solid var(--border);
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border: 3px solid var(--border);
+            border-radius: 50%;
+            border-top-color: var(--accent);
+            animation: spin 1s linear infinite;
+            margin-right: 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 600;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 1;
+        }
+        
+        .modal-content {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            max-width: 520px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+            transform: scale(0.95) translateY(-20px);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .modal.show .modal-content {
+            transform: scale(1) translateY(0);
+        }
+        
+        .modal-header {
+            background: var(--border);
+            padding: 20px 28px;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: 0.3px;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            color: var(--text-muted);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        
+        .close-btn:hover {
+            color: var(--error);
+            background: var(--error-muted);
+        }
+        
+        .modal-body {
+            padding: 28px;
+        }
+        
+        .modal-body p {
+            margin-bottom: 24px;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+        
+        .message {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 15px;
+            font-weight: 600;
+            border-left: 4px solid transparent;
+        }
+        
+        .message.success {
+            background: var(--success-muted);
+            color: var(--success);
+            border-left-color: var(--success);
+        }
+        
+        .message.error {
+            background: var(--error-muted);
+            color: var(--error);
+            border-left-color: var(--error);
+        }
+        
+        .passphrase-input {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 20px 0;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 15px;
+            width: 100%;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        
+        .passphrase-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-muted);
+        }
+        
+        .passphrase-help {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--bg);
+            border-radius: 6px;
+            border-left: 4px solid var(--accent);
+            line-height: 1.6;
+        }
+        
+        .passphrase-help strong {
+            color: var(--text);
+            font-weight: 700;
+        }
+        
+        .modal-error {
+            background: var(--error-muted);
+            color: var(--error);
+            padding: 14px 18px;
+            border-radius: 6px;
+            margin: 16px 0;
+            font-size: 14px;
+            border: 1px solid var(--error);
+            font-weight: 600;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 16px;
+            margin-top: 28px;
+        }
+        
+        .modal-buttons .btn {
+            margin: 0;
+            flex: 1;
+        }
+        
+        .prompt {
+            color: var(--accent);
+            font-weight: 700;
+            margin-bottom: 24px;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+        }
+        
+        .prompt::before {
+            content: '$ ';
+            color: var(--text-muted);
+        }
+        
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* Focus improvements */
+        *:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+        
+        .btn:focus-visible,
+        .file-input:focus-visible,
+        .passphrase-input:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px var(--accent-muted);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+                margin-bottom: 32px;
+            }
+            
+            .title {
+                font-size: 24px;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .tab {
+                text-align: center;
+                border-bottom: none;
+                border-right: 3px solid transparent;
+            }
+            
+            .tab.active {
+                border-right-color: var(--accent);
+                border-bottom-color: transparent;
+            }
+            
+            .modal-content {
+                width: 95%;
+                margin: 20px;
+            }
+            
+            .modal-buttons {
+                flex-direction: column;
+            }
+            
+            .terminal-body {
+                padding: 24px;
+            }
+            
+            .form-group {
+                margin-bottom: 24px;
+            }
+        }
+        
+        /* Smooth transitions for status changes */
+        .file-status {
+            animation: statusUpdate 0.3s ease;
+        }
+        
+        @keyframes statusUpdate {
+            0% {
+                opacity: 0.7;
+                transform: translateX(-4px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        /* Prevent layout shift during loading */
+        .file-status:empty {
+            display: none;
+        }
+        
+        /* Enhanced scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--surface);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-hover);
+        }
+    </style>
+</head>
+<body data-theme="dark">
+    <div class="container">
+        <header class="header">
+            <div>
+                <h1 class="title">xsukax GPG/PGP File Encryptor/Decryptor</h1>
+                <p class="subtitle">Secure Client-Side File Encryption & Decryption</p>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme" title="Switch between dark and light theme"></button>
+        </header>
+        
+        <main class="terminal">
+            <div class="terminal-header">~/crypto/fileops - xsukax GPG/PGP Tools</div>
+            <div class="terminal-body">
+                <nav class="tabs" role="tablist">
+                    <button class="tab active" onclick="switchTab('encrypt')" role="tab" aria-selected="true" aria-controls="encrypt-tab">Encryption</button>
+                    <button class="tab" onclick="switchTab('decrypt')" role="tab" aria-selected="false" aria-controls="decrypt-tab">Decryption</button>
+                </nav>
+
+                <div id="encrypt-tab" class="tab-content active" role="tabpanel" aria-labelledby="encrypt-tab">
+                    <div class="prompt">gpg --encrypt --armor --interactive</div>
+                    
+                    <div class="form-group">
+                        <label class="label" for="encryptKey">GPG/PGP Key File</label>
+                        <input type="file" id="encryptKey" class="file-input" accept=".asc,.gpg,.pgp" onchange="handleKeyFile('encrypt')" aria-describedby="encryptKeyHelp">
+                        <div id="encryptKeyStatus" class="file-status">Select a GPG/PGP key file (.asc, .gpg, .pgp) - public or private key accepted</div>
+                        <div id="encryptKeyHelp" class="sr-only">Choose a GPG or PGP key file for encryption. Both public and private keys are supported.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="label" for="encryptFile">File to Encrypt</label>
+                        <input type="file" id="encryptFile" class="file-input" onchange="handleInputFile('encrypt')" aria-describedby="encryptFileHelp">
+                        <div id="encryptFileStatus" class="file-status">Select any file to encrypt with the GPG/PGP key</div>
+                        <div id="encryptFileHelp" class="sr-only">Choose any file that you want to encrypt using GPG/PGP encryption.</div>
+                    </div>
+
+                    <button class="btn" id="encryptBtn" onclick="encryptFile()" disabled aria-describedby="encryptBtnHelp">Execute Encryption</button>
+                    <div id="encryptBtnHelp" class="sr-only">This button will be enabled once both a key file and input file are selected.</div>
+                </div>
+
+                <div id="decrypt-tab" class="tab-content" role="tabpanel" aria-labelledby="decrypt-tab">
+                    <div class="prompt">gpg --decrypt --interactive</div>
+                    
+                    <div class="form-group">
+                        <label class="label" for="decryptKey">Private Key File</label>
+                        <input type="file" id="decryptKey" class="file-input" accept=".asc,.gpg,.pgp" onchange="handleKeyFile('decrypt')" aria-describedby="decryptKeyHelp">
+                        <div id="decryptKeyStatus" class="file-status">Select a private GPG/PGP key file (.asc, .gpg, .pgp)</div>
+                        <div id="decryptKeyHelp" class="sr-only">Choose your private GPG or PGP key file for decryption. This must be the private key corresponding to the public key used for encryption.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="label" for="decryptFile">Encrypted File</label>
+                        <input type="file" id="decryptFile" class="file-input" onchange="handleInputFile('decrypt')" aria-describedby="decryptFileHelp">
+                        <div id="decryptFileStatus" class="file-status">Select encrypted file to decrypt</div>
+                        <div id="decryptFileHelp" class="sr-only">Choose the encrypted file that you want to decrypt using your private key.</div>
+                    </div>
+
+                    <button class="btn" id="decryptBtn" onclick="decryptFile()" disabled aria-describedby="decryptBtnHelp">Execute Decryption</button>
+                    <div id="decryptBtnHelp" class="sr-only">This button will be enabled once both a private key and encrypted file are selected.</div>
+                </div>
+
+                <div class="loading" id="loading" role="status" aria-live="polite">
+                    <div class="spinner" aria-hidden="true"></div>
+                    <span class="loading-text" id="loadingText">Processing...</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Result Modal -->
+    <div class="modal" id="resultModal" role="dialog" aria-labelledby="modalTitle" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Operation Result</h2>
+                <button class="close-btn" onclick="closeModal('resultModal')" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modalMessage" class="message" role="alert"></div>
+                <button class="btn" id="downloadBtn" onclick="downloadResult()" style="display: none;">Download Result</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Passphrase Modal -->
+    <div class="modal" id="passphraseModal" role="dialog" aria-labelledby="passphraseTitle" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="passphraseTitle">Private Key Passphrase</h2>
+                <button class="close-btn" onclick="closeModal('passphraseModal')" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Your private key is protected with a passphrase. Please enter it to continue.</p>
+                <label for="modalPassphrase" class="sr-only">Enter your private key passphrase</label>
+                <input type="password" id="modalPassphrase" class="passphrase-input" placeholder="Enter passphrase..." autocomplete="current-password" aria-describedby="passphraseHelp">
+                <div id="passphraseHelp" class="passphrase-help">
+                    <strong>Security Note:</strong><br>
+                    • Your passphrase is processed locally and never sent to any server<br>
+                    • Enter the exact passphrase used when creating your private key<br>
+                    • Passphrase is case-sensitive and preserves all characters
+                </div>
+                <div id="passphraseError" class="modal-error" style="display: none;" role="alert"></div>
+                <div class="modal-buttons">
+                    <button class="btn btn-secondary" onclick="cancelPassphrase()">Cancel</button>
+                    <button class="btn" onclick="continueWithPassphrase()" id="continueBtn">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Application state
+        const state = {
+            currentTab: 'encrypt',
+            encrypt: { keyFile: null, inputFile: null, keyData: null },
+            decrypt: { keyFile: null, inputFile: null, keyData: null },
+            result: { data: null, filename: null },
+            pending: { keyText: null, mode: null }
+        };
+
+        // Theme management
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('xsukax-theme', newTheme);
+        }
+
+        // Tab management with smooth transitions
+        function switchTab(tab) {
+            // Prevent double-clicking issues
+            if (state.currentTab === tab) return;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach((t, index) => {
+                const isActive = (tab === 'encrypt' && index === 0) || (tab === 'decrypt' && index === 1);
+                t.classList.toggle('active', isActive);
+                t.setAttribute('aria-selected', isActive);
+            });
+
+            // Smooth transition between tab contents
+            const currentContent = document.getElementById(`${state.currentTab}-tab`);
+            const newContent = document.getElementById(`${tab}-tab`);
+            
+            currentContent.style.opacity = '0';
+            currentContent.style.transform = 'translateY(8px)';
+            
+            setTimeout(() => {
+                currentContent.classList.remove('active');
+                newContent.classList.add('active');
+                
+                // Force reflow
+                newContent.offsetHeight;
+                
+                newContent.style.opacity = '1';
+                newContent.style.transform = 'translateY(0)';
+            }, 150);
+            
+            state.currentTab = tab;
+        }
+
+        // Enhanced status update with smooth transitions
+        function updateFileStatus(mode, message, type = 'info', immediate = false) {
+            const statusEl = document.getElementById(`${mode}Status`);
+            
+            if (immediate) {
+                statusEl.textContent = message;
+                statusEl.className = `file-status ${type}`;
+                return;
+            }
+            
+            // Smooth status transition
+            statusEl.style.opacity = '0.7';
+            statusEl.style.transform = 'translateX(-4px)';
+            
+            setTimeout(() => {
+                statusEl.textContent = message;
+                statusEl.className = `file-status ${type}`;
+                statusEl.style.opacity = '1';
+                statusEl.style.transform = 'translateX(0)';
+            }, 100);
+        }
+
+        // Passphrase validation
+        async function validatePrivateKey(keyText, passphrase = '') {
+            try {
+                const privateKey = await openpgp.readPrivateKey({ armoredKey: keyText });
+                
+                if (privateKey.isDecrypted()) {
+                    return { 
+                        success: true, 
+                        key: privateKey, 
+                        needsPassphrase: false,
+                        message: 'Private key loaded successfully (no passphrase required)'
+                    };
+                } else {
+                    if (!passphrase) {
+                        return { 
+                            success: false, 
+                            needsPassphrase: true, 
+                            error: 'This private key requires a passphrase' 
+                        };
+                    }
+                    
+                    try {
+                        const decryptedKey = await openpgp.decryptKey({
+                            privateKey: privateKey,
+                            passphrase: passphrase
+                        });
+                        return { 
+                            success: true, 
+                            key: decryptedKey, 
+                            needsPassphrase: true,
+                            message: 'Private key decrypted successfully with passphrase'
+                        };
+                    } catch (decryptError) {
+                        return { 
+                            success: false, 
+                            needsPassphrase: true, 
+                            error: 'Incorrect passphrase. Please try again.' 
+                        };
+                    }
+                }
+            } catch (error) {
+                return { 
+                    success: false, 
+                    needsPassphrase: false, 
+                    error: `Invalid private key format: ${error.message}` 
+                };
+            }
+        }
+
+        // Enhanced file handling with better user feedback
+        async function handleKeyFile(mode) {
+            const fileInput = document.getElementById(`${mode}Key`);
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+
+            try {
+                updateFileStatus(`${mode}Key`, 'Reading key file...', 'warning');
+                
+                const keyText = await readFileAsText(file);
+                
+                if (mode === 'encrypt') {
+                    // Try public key first for encryption
+                    try {
+                        const publicKey = await openpgp.readKey({ armoredKey: keyText });
+                        state.encrypt.keyFile = file;
+                        state.encrypt.keyData = publicKey;
+                        updateFileStatus('encryptKey', `Public key loaded: ${file.name} (${formatFileSize(file.size)})`, 'success');
+                        updateButtonState(mode);
+                        return;
+                    } catch (pubError) {
+                        // Try private key for encryption
+                        const validation = await validatePrivateKey(keyText);
+                        if (validation.success) {
+                            state.encrypt.keyFile = file;
+                            state.encrypt.keyData = validation.key;
+                            updateFileStatus('encryptKey', `${validation.message}: ${file.name}`, 'success');
+                            updateButtonState(mode);
+                        } else if (validation.needsPassphrase) {
+                            state.pending = { keyText, mode };
+                            updateFileStatus('encryptKey', 'Waiting for passphrase...', 'warning');
+                            showPassphraseModal();
+                        } else {
+                            updateFileStatus('encryptKey', validation.error, 'error');
+                        }
+                    }
+                } else {
+                    // Decryption mode requires private key
+                    const validation = await validatePrivateKey(keyText);
+                    if (validation.success) {
+                        state.decrypt.keyFile = file;
+                        state.decrypt.keyData = validation.key;
+                        updateFileStatus('decryptKey', `${validation.message}: ${file.name}`, 'success');
+                        updateButtonState(mode);
+                    } else if (validation.needsPassphrase) {
+                        state.pending = { keyText, mode };
+                        updateFileStatus('decryptKey', 'Waiting for passphrase...', 'warning');
+                        showPassphraseModal();
+                    } else {
+                        updateFileStatus('decryptKey', validation.error, 'error');
+                    }
+                }
+            } catch (error) {
+                updateFileStatus(`${mode}Key`, `Failed to read file: ${error.message}`, 'error');
+                console.error('Key file error:', error);
+            }
+        }
+
+        async function handleInputFile(mode) {
+            const fileInput = document.getElementById(`${mode}File`);
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+
+            state[mode].inputFile = file;
+            updateFileStatus(`${mode}File`, `File selected: ${file.name} (${formatFileSize(file.size)})`, 'success');
+            updateButtonState(mode);
+        }
+
+        function updateButtonState(mode) {
+            const btn = document.getElementById(`${mode}Btn`);
+            const currentState = state[mode];
+            const wasDisabled = btn.disabled;
+            const shouldDisable = !(currentState.keyData && currentState.inputFile);
+            
+            if (wasDisabled !== shouldDisable) {
+                btn.disabled = shouldDisable;
+                // Add visual feedback for button state change
+                if (!shouldDisable) {
+                    btn.style.transform = 'scale(1.02)';
+                    setTimeout(() => btn.style.transform = '', 200);
+                }
+            }
+        }
+
+        // Passphrase modal management
+        function showPassphraseModal() {
+            const modal = document.getElementById('passphraseModal');
+            modal.style.display = 'flex';
+            
+            // Trigger animation
+            setTimeout(() => {
+                modal.classList.add('show');
+                setTimeout(() => document.getElementById('modalPassphrase').focus(), 100);
+            }, 10);
+            
+            hidePassphraseError();
+        }
+
+        async function continueWithPassphrase() {
+            const passphrase = document.getElementById('modalPassphrase').value;
+            const continueBtn = document.getElementById('continueBtn');
+            
+            if (!state.pending.keyText || !state.pending.mode) {
+                showPassphraseError('Session expired. Please select your key file again.');
+                return;
+            }
+
+            try {
+                continueBtn.disabled = true;
+                continueBtn.textContent = 'Validating...';
+                hidePassphraseError();
+                
+                const validation = await validatePrivateKey(state.pending.keyText, passphrase);
+                
+                if (validation.success) {
+                    const mode = state.pending.mode;
+                    state[mode].keyData = validation.key;
+                    state[mode].keyFile = { name: 'Private Key (Encrypted)' };
+                    
+                    updateFileStatus(`${mode}Key`, validation.message, 'success', true);
+                    updateButtonState(mode);
+                    closeModal('passphraseModal');
+                    clearPendingState();
+                } else {
+                    showPassphraseError(validation.error);
+                    document.getElementById('modalPassphrase').select();
+                }
+            } catch (error) {
+                showPassphraseError(`Unexpected error: ${error.message}`);
+                console.error('Passphrase validation error:', error);
+            } finally {
+                continueBtn.disabled = false;
+                continueBtn.textContent = 'Continue';
+            }
+        }
+
+        function cancelPassphrase() {
+            closeModal('passphraseModal');
+            
+            if (state.pending.mode) {
+                updateFileStatus(`${state.pending.mode}Key`, 'Operation cancelled. Please select a key file.', 'error', true);
+            }
+            
+            clearPendingState();
+        }
+
+        function clearPendingState() {
+            state.pending = { keyText: null, mode: null };
+            document.getElementById('modalPassphrase').value = '';
+            hidePassphraseError();
+        }
+
+        function showPassphraseError(message) {
+            const errorDiv = document.getElementById('passphraseError');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hidePassphraseError() {
+            const errorDiv = document.getElementById('passphraseError');
+            errorDiv.style.display = 'none';
+        }
+
+        // Enhanced encryption/decryption with better feedback
+        async function encryptFile() {
+            if (!state.encrypt.keyData || !state.encrypt.inputFile) {
+                showResult('Encryption Failed', 'Please select both a key file and input file.', 'error');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const loadingText = document.getElementById('loadingText');
+            const btn = document.getElementById('encryptBtn');
+            
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Encrypting...';
+                loading.style.display = 'block';
+                loadingText.textContent = 'Encrypting file...';
+
+                const fileData = await readFileAsArrayBuffer(state.encrypt.inputFile);
+                const uint8Array = new Uint8Array(fileData);
+
+                const encrypted = await openpgp.encrypt({
+                    message: await openpgp.createMessage({ binary: uint8Array }),
+                    encryptionKeys: state.encrypt.keyData,
+                    format: 'armored'
+                });
+
+                state.result.data = encrypted;
+                state.result.filename = `${state.encrypt.inputFile.name}.asc`;
+                
+                showResult('Encryption Successful', 
+                    `File "${state.encrypt.inputFile.name}" has been encrypted successfully. Click below to download the encrypted file.`, 
+                    'success');
+
+            } catch (error) {
+                console.error('Encryption error:', error);
+                showResult('Encryption Failed', `Error: ${error.message}`, 'error');
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+                btn.textContent = 'Execute Encryption';
+            }
+        }
+
+        async function decryptFile() {
+            if (!state.decrypt.keyData || !state.decrypt.inputFile) {
+                showResult('Decryption Failed', 'Please select both a private key and encrypted file.', 'error');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const loadingText = document.getElementById('loadingText');
+            const btn = document.getElementById('decryptBtn');
+            
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Decrypting...';
+                loading.style.display = 'block';
+                loadingText.textContent = 'Decrypting file...';
+
+                const encryptedData = await readFileAsText(state.decrypt.inputFile);
+                const message = await openpgp.readMessage({ armoredMessage: encryptedData });
+                
+                const { data: decrypted } = await openpgp.decrypt({
+                    message,
+                    decryptionKeys: state.decrypt.keyData,
+                    format: 'binary'
+                });
+
+                state.result.data = new Uint8Array(decrypted);
+                state.result.filename = state.decrypt.inputFile.name.replace(/\.(asc|gpg|pgp)$/i, '');
+                
+                showResult('Decryption Successful', 
+                    `File "${state.decrypt.inputFile.name}" has been decrypted successfully. Click below to download the original file.`, 
+                    'success');
+
+            } catch (error) {
+                console.error('Decryption error:', error);
+                showResult('Decryption Failed', `Error: ${error.message}`, 'error');
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+                btn.textContent = 'Execute Decryption';
+            }
+        }
+
+        // Enhanced result modal
+        function showResult(title, message, type) {
+            document.getElementById('modalTitle').textContent = title;
+            const messageEl = document.getElementById('modalMessage');
+            messageEl.textContent = message;
+            messageEl.className = `message ${type}`;
+            
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.style.display = type === 'success' ? 'block' : 'none';
+            
+            const modal = document.getElementById('resultModal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function downloadResult() {
+            if (!state.result.data || !state.result.filename) {
+                console.error('No result data available');
+                return;
+            }
+
+            try {
+                const blob = new Blob([state.result.data], { type: 'application/octet-stream' });
+                const url = window.URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = state.result.filename;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                }, 100);
+                
+                // Visual feedback
+                const btn = document.getElementById('downloadBtn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Downloaded!';
+                btn.style.background = 'var(--success)';
+                
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '';
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Download error:', error);
+                showResult('Download Failed', `Error downloading file: ${error.message}`, 'error');
+            }
+        }
+
+        // Enhanced modal management
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('show');
+            
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+            
+            if (modalId === 'passphraseModal') {
+                clearPendingState();
+            }
+        }
+
+        // Utility functions
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = () => reject(new Error('Failed to read file as text'));
+                reader.readAsText(file);
+            });
+        }
+
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = () => reject(new Error('Failed to read file as binary'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load theme preference
+            const savedTheme = localStorage.getItem('xsukax-theme') || 'dark';
+            document.body.setAttribute('data-theme', savedTheme);
+            
+            // Check OpenPGP library
+            if (typeof openpgp === 'undefined') {
+                console.error('OpenPGP library failed to load');
+                setTimeout(() => {
+                    showResult('Library Error', 'OpenPGP library failed to load. Please check your internet connection and refresh the page.', 'error');
+                }, 1000);
+            }
+            
+            // Initialize tab content animations
+            document.querySelectorAll('.tab-content').forEach(content => {
+                if (!content.classList.contains('active')) {
+                    content.style.opacity = '0';
+                    content.style.transform = 'translateY(8px)';
+                }
+            });
+        });
+
+        // Event listeners
+        document.getElementById('resultModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal('resultModal');
+        });
+
+        document.getElementById('passphraseModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal('passphraseModal');
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal('resultModal');
+                closeModal('passphraseModal');
+            }
+        });
+
+        document.getElementById('modalPassphrase').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                continueWithPassphrase();
+            }
+        });
+
+        // Prevent form submission on enter key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.target.type === 'file') {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>
